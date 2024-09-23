@@ -1,0 +1,171 @@
+/*______________________________________________________*/
+
+/* Déclaration des paramètres */
+
+int n = 50; // Nombre de triangles par bords du domaine
+real m = 1; // Unité de coté pour le domaine
+
+int Nb = 100; // Nombre de personnes
+real S0 = 0.9*Nb; // Nombre de susceptibles inital
+real I0 = Nb - S0; // Nombre d'infectés inital
+real R0 = 0; // Nombre d'immunisés inital
+
+real a = 0.7; // Taux d'infection
+real r = real(1)/14; // Taux de rétablissement
+
+real T = 30; // Periode de temps en jours
+real dt = real(1)/12; // Intervalle de temps de 2 heures (1/12 de jour)
+real du1 = 0.1; // Coefficient de diffusion 1 homogène
+real du2 = 1; // Coefficient de diffusion 2 homogène
+
+func route = (y<=1.6*m && y>=1.4*m);
+func du = du1*(!route) + du2*route; // Coefficient de diffusion non homogène
+
+// real du = 1; // Coefficient de diffusion homogène
+
+/*__________________________ ____________________________*/
+
+/* Maillage d'un domaine rectangulaire de longueur 4*m et de largeur 3*m */
+
+border Gamma1(t=0,4*m) { x = t; y = 0; label=1; }
+border Gamma2(t=0,3*m) { x = 4*m; y = t; label=2; }
+border Gamma3(t=4*m,0) { x = t; y = 3*m; label=3; }
+border Gamma4(t=3*m,0) { x = 0; y = t; label=4; }
+
+mesh Th = buildmesh(Gamma1(n) + Gamma2(n) + Gamma3(n) + Gamma4(n)); // construction
+plot(Th, wait=1);
+
+/*______________________________________________________*/
+
+/* Declaration de l'espace des elements finis */
+
+fespace Vh(Th,P1);
+Vh Sh,Ih,Rh,Sold,Iold,Rold,vh;
+
+/*______________________________________________________*/
+
+/* Definition des conditions de bord de Neumann homogenes de Sh, Ih et Rh */
+
+func g = 0;
+func h = 0;
+func k = 0;
+
+/*______________________________________________________*/
+
+/* Definition du probleme variationnel */
+
+problem S(Sh,vh,solver=LU) =
+      int2d(Th)(Sh*vh + dt*du*(dx(Sh)*dx(vh) + dy(Sh)*dy(vh))) + int2d(Th)(-Sold*vh) + int2d(Th)(dt*r*Sold*Iold*vh) - int1d(Th)(dt*du*g*vh);
+
+problem I(Ih,vh,solver=LU) =
+      int2d(Th)(Ih*vh + dt*du*(dx(Ih)*dx(vh) + dy(Ih)*dy(vh))) + int2d(Th)(-Iold*vh) + int2d(Th)(-dt*r*Sold*Iold*vh) + int2d(Th)(dt*a*Iold*vh) - int1d(Th)(dt*du*h*vh);
+
+problem R(Rh,vh,solver=LU) =
+      int2d(Th)(Rh*vh + dt*du*(dx(Rh)*dx(vh) + dy(Rh)*dy(vh))) + int2d(Th)(-Rold*vh) + int2d(Th)(-dt*a*Iold*vh) - int1d(Th)(dt*du*k*vh);
+
+/*______________________________________________________*/
+
+/* Définition des conditions intiales pour t=0 */
+
+
+/* Les infectes initiaux dans un carré centré */
+
+/*
+func rec0 = x>=1.8*m && x<= 2.2*m && y>=1.3*m && y<=1.7*m;
+Sold = S0*(!rec0);
+Iold = I0*rec0;
+Rold = R0;
+*/
+
+/* Les infectés initiaux dans un rectangle décentré sur la droite */
+
+
+func rec1 = (x>=3.4*m && x<= 3.6*m && y>=1.25*m && y<=1.75*m);
+Sold = S0*(!rec1);
+Iold = I0*rec1;
+Rold = R0;
+
+
+/* Les infectés initiaux dans un rectangle décentré sur la gauche */
+
+/*
+func rec2 = (x>=0.6*m && x<= 0.8*m && y>=1.25*m && y<=1.75*m);
+Sold = S0*(!rec2);
+Iold = I0*rec2;
+Rold = R0;
+*/
+
+/* Les infectés initiaux dans deux rectangles décentrés sur la droite et la gauche */
+
+/*
+func rec3 = (x>=3.4*m && x<= 3.6*m && y>=0.5*m && y<=1*m) || (x>=0.6*m && x<= 0.8*m && y>=2*m && y<=2.5*m);
+Sold = S0*(!rec3);
+Iold = I0*rec3;
+Rold = R0;
+*/
+
+/* Les infectes initiaux dans cercle centré de rayon 3*m/10 */
+
+/*
+real rayon = real(3*m)/10;
+real centrex = real(4*m)/2;
+real centrey = real(3*m)/2;
+
+func cercle = ((x-centrex)^2 + (y-centrey)^2) <= rayon^2;
+Sold = S0*(!cercle);
+Iold = I0*cercle;
+Rold = R0;
+*/
+
+/* Les infectes initiaux dans rectangle long centré horizontal */
+
+/*
+func rec4 = (x>=1.25*m && x<= 2.75*m && y>=1.4*m && y<=1.6*m);
+Sold = S0*(!rec4);
+Iold = I0*rec4;
+Rold = R0;
+*/
+
+/* Les infectes initiaux dans rectangle long centré vertical */
+
+/*
+func rec5 = (x>=1.85*m && x<= 2.15*m && y>=0.75*m && y<=2.25*m);
+Sold = S0*(!rec5);
+Iold = I0*rec5;
+Rold = R0;
+*/
+
+/*______________________________________________________*/
+
+/* Time loop */
+
+real t = 0;
+
+/* Plot pour t=0 */
+string legendeS = "S pour S0 =" + S0 + ", I0 =" + I0 + ", R0 =" + R0 + ", a = " + a + ", r = " + r + " : t =" + t;
+string legendeI = "I pour S0 =" + S0 + ", I0 =" + I0 + ", R0 =" + R0 + ", a = " + a + ", r = " + r + " : t =" + t;
+string legendeR = "R pour S0 =" + S0 + ", I0 =" + I0 + ", R0 =" + R0 + ", a = " + a + ", r = " + r + " : t =" + t;
+plot(Sold,wait=1,cmm=legendeS,fill=1,value=1,ps="S.eps");
+plot(Iold,wait=1,cmm=legendeI,fill=1,value=1,ps="I.eps");
+plot(Rold,wait=1,cmm=legendeR,fill=1,value=1,ps="R.eps");
+
+for (int i = 0; i < T/dt ; ++i){
+  t = t+dt;
+
+  // Resolution du probleme
+  S;
+  I;
+  R;
+
+  Sold = Sh;
+  Iold = Ih;
+  Rold = Rh;
+
+  // Plot
+  string legendeS = "S pour S0 =" + S0 + ", I0 =" + I0 + ", R0 =" + R0 + ", a = " + a + ", r = " + r + " : t =" + t;
+  string legendeI = "I pour S0 =" + S0 + ", I0 =" + I0 + ", R0 =" + R0 + ", a = " + a + ", r = " + r + " : t =" + t;
+  string legendeR = "R pour S0 =" + S0 + ", I0 =" + I0 + ", R0 =" + R0 + ", a = " + a + ", r = " + r + " : t =" + t;
+  //plot(Sh,wait=1,cmm=legendeS,fill=1,value=1,ps="S.eps");
+  //plot(Ih,wait=1,cmm=legendeI,fill=1,value=1,ps="I.eps");
+  plot(Rh,wait=1,cmm=legendeR,fill=1,value=1,ps="R.eps");
+}
